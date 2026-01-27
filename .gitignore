@@ -1,1 +1,5 @@
 /venv
+/raw_data
+/sand_data
+/processed
+/runs
