@@ -1,0 +1,22 @@
+"categories": [
+  {
+    "id": 1,
+    "supercategory": "terrain",
+    "name": "sand"
+  },
+  {
+    "id": 2,
+    "supercategory": "terrain",
+    "name": "compacted_sand"
+  },
+  {
+    "id": 10,
+    "supercategory": "obstacle",
+    "name": "rock"
+  },
+  {
+    "id": 20,
+    "supercategory": "hazard",
+    "name": "crater"
+  }
+]

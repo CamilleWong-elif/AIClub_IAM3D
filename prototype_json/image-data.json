@@ -1,0 +1,17 @@
+"images": [
+  {
+    "id": 42,
+    "file_name": "frame_0042.png",
+    "timestamp": 1680342345.23,
+    "lighting": {
+      "time_of_day": "afternoon",
+      "sun_angle_deg": 37.5,
+      "illumination_level": "high",
+      "shadows_present": true
+    },
+    "environment": {
+      "dust_level": "low",
+      "wind_estimate": "moderate"
+    }
+  }
+]

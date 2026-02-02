@@ -1,0 +1,15 @@
+"dataset_info": {
+  "name": "RoverTerrainCV",
+  "version": "0.1",
+  "domain": "EarthPrototype",
+  "target_domain": "Mars",
+  "annotation_type": ["bbox", "segmentation", "depth", "risk"]
+},
+
+"sensor_info": {
+  "camera_type": "RGB",
+  "resolution": [1920, 1080],
+  "fov_degrees": 90,
+  "mount_position": "front",
+  "additional_sensors": ["IMU", "wheel_odometry"]
+}

@@ -1,0 +1,36 @@
+"annotations": [
+  {
+    "id": 9001,
+    "image_id": 42,
+    "category_id": 10,
+    "bbox": [820, 540, 180, 130],
+    "segmentation": [[...]],
+    "geometry": {
+      "size_class": "medium",
+      "height_estimate_m": 0.28,
+      "shape": "angular"
+    },
+    "material": {
+      "hardness_estimate": "hard",
+      "stability": "loose",
+      "surface_roughness": "high"
+    },
+    "appearance": {
+      "dominant_color": "reddish_brown",
+      "texture": "granular",
+      "albedo_estimate": 0.34
+    },
+    "risk_assessment": {
+      "wheel_damage_risk": 0.78,
+      "slip_risk": 0.42,
+      "tip_over_risk": 0.31
+    },
+    "affordances": {
+      "can_drive_over": false,
+      "can_drive_around": true,
+      "can_climb": false
+    },
+    "traversability": "unsafe",
+    "confidence": 0.91
+  }
+]

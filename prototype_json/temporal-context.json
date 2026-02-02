@@ -1,0 +1,10 @@
+"temporal_context": {
+  "previous_frame_id": 41,
+  "next_frame_id": 43,
+  "rover_outcome": {
+    "wheel_slip_detected": true,
+    "progress_m": 0.4,
+    "energy_consumed_wh": 18.7,
+    "damage_event": false
+  }
+}

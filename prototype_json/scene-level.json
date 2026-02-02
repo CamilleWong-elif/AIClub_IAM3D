@@ -1,0 +1,10 @@
+"scene_labels": [
+  {
+    "image_id": 42,
+    "terrain_difficulty": 0.72,
+    "obstacle_density": "high",
+    "average_slope_deg": 14.3,
+    "visibility_score": 0.81,
+    "recommended_behavior": "slow_navigation"
+  }
+]
