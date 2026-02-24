@@ -46,8 +46,9 @@ def _get_detector(cfg: dict):
         except ImportError:
             raise ImportError("YOLO detector requires 'ultralytics'. Install with: pip install ultralytics")
     if dtype == "cnn":
-        from models.cnn_detector import CNNDetector
-        return CNNDetector(device=device)
+        from detectors.cnn_detector import CNNDetector
+        checkpoint_path = det_cfg.get("checkpoint_path", None)
+        return CNNDetector(device=device, checkpoint_path=checkpoint_path)
     if dtype == "mock":
         from detectors.mock_detector import MockDetector
         return MockDetector()
@@ -110,19 +111,6 @@ def images(
     frame_skip: Optional[int] = None,
     image_ext: str = "jpg",
 ) -> int:
-    """
-    Convert a video file into a folder of images (one per frame, or every frame_skip frames).
-
-    Args:
-        video_path: Path to the input video file.
-        output_dir: Directory to write frame images (created if needed).
-        config_path: Optional path to config.json; uses bbox_standalone/config.json if not set.
-        frame_skip: If set, write every Nth frame (1 = every frame, 2 = every 2nd, etc.).
-        image_ext: Image extension (e.g. 'jpg', 'png').
-
-    Returns:
-        Number of images written.
-    """
     import cv2
     cfg = _load_config(config_path)
     skip = frame_skip if frame_skip is not None else cfg.get("video", {}).get("frame_skip", 1)
@@ -151,19 +139,6 @@ def labels(
     output_labels_dir: str,
     config_path: Optional[str] = None,
 ) -> int:
-    """
-    Run the configured detector on each image in input_images_dir, apply NMS,
-    and write YOLO-format label files (class_id cx cy w h normalized) to output_labels_dir.
-    Label filenames match image basenames with .txt extension.
-
-    Args:
-        input_images_dir: Folder containing images (.jpg, .png, .jpeg).
-        output_labels_dir: Folder where .txt label files will be written.
-        config_path: Optional path to config.json.
-
-    Returns:
-        Number of label files written.
-    """
     import cv2
     cfg = _load_config(config_path)
     detector = _get_detector(cfg)
@@ -202,18 +177,6 @@ def process_video(
     output_boxes_path: str,
     config_path: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Process a video: run detector + NMS per frame and save bounding boxes to a single JSON file.
-    Does not save intermediate images. Output can be used by run_tracking().
-
-    Args:
-        video_path: Path to the input video.
-        output_boxes_path: Path to write JSON (e.g. boxes.json) with per-frame boxes and metadata.
-        config_path: Optional path to config.json.
-
-    Returns:
-        Metadata dict with num_frames, frame_size, output_path.
-    """
     import cv2
     cfg = _load_config(config_path)
     detector = _get_detector(cfg)
@@ -257,22 +220,6 @@ def run_tracking(
     config_path: Optional[str] = None,
     write_video: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Re-read the video and the AI-generated boxes JSON (from process_video), run track association
-    across frames to assign consistent track IDs, and write the result (tracked boxes JSON and
-    optionally a video with boxes and IDs drawn).
-
-    Args:
-        video_path: Path to the same video used to generate boxes_path.
-        boxes_path: JSON file produced by process_video (frames of detections).
-        output_path: Base path for outputs: output_path.json (tracked per-frame boxes) and
-                     if write_video, output_path.mp4 (video with drawn boxes and track IDs).
-        config_path: Optional path to config.json.
-        write_video: If True, render an output video with bounding boxes and track IDs drawn.
-
-    Returns:
-        Metadata with num_frames, num_tracks, output_json_path, output_video_path (if written).
-    """
     import cv2
     cfg = _load_config(config_path)
     with open(boxes_path, "r", encoding="utf-8") as f:
@@ -281,10 +228,9 @@ def run_tracking(
     frame_size = data.get("frame_size", [640, 480])
     iou_th = cfg.get("tracking", {}).get("iou_threshold", 0.3)
 
-    # Active tracks: list of dicts with track_id and box (x1,y1,x2,y2,score,class_id)
     next_track_id = 0
-    active_tracks = []  # each: {"track_id": int, "x1", "y1", "x2", "y2", "score", "class_id"}
-    tracked_frames = []  # per frame: list of {track_id, x1, y1, x2, y2, score, class_id}
+    active_tracks = []
+    tracked_frames = []
     all_track_ids_seen = set()
 
     for frame_dets in frames_boxes:
@@ -293,13 +239,10 @@ def run_tracking(
         matches, unmatched_track_idx, unmatched_det_idx = track_association(
             track_boxes, det_boxes, iou_th=iou_th
         )
-        # Update matched tracks with new box from detection (keep full detection info)
         for ti, di in matches:
             det = frame_dets[di]
             active_tracks[ti] = {"track_id": active_tracks[ti]["track_id"], **det}
-        # Remove unmatched tracks (optional: could keep for max_age frames)
         new_active = [active_tracks[i] for i in range(len(active_tracks)) if i not in unmatched_track_idx]
-        # Add new tracks for unmatched detections
         for di in unmatched_det_idx:
             new_active.append({"track_id": next_track_id, **frame_dets[di]})
             all_track_ids_seen.add(next_track_id)

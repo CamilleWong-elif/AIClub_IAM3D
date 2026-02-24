@@ -1,13 +1,14 @@
 {
-  "device": "cpu",
+  "device": "cuda",
   "video": {
     "frame_skip": 1,
     "image_ext": "jpg",
     "fps": 30
   },
   "detector": {
-    "type": "mock",
-    "model_path": "yolov8n.pt"
+    "type": "cnn",
+    "model_path": "yolov8n.pt",
+    "checkpoint_path": "checkpoints/cnn_detector_best.pt"
   },
   "nms": {
     "iou_threshold": 0.5,
