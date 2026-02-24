@@ -1,0 +1,26 @@
+{
+  "device": "cpu",
+  "video": {
+    "frame_skip": 1,
+    "image_ext": "jpg",
+    "fps": 30
+  },
+  "detector": {
+    "type": "mock",
+    "model_path": "yolov8n.pt"
+  },
+  "nms": {
+    "iou_threshold": 0.5,
+    "score_threshold": 0.3
+  },
+  "tracking": {
+    "iou_threshold": 0.3
+  },
+  "paths": {
+    "default_video": "",
+    "default_frames_dir": "frames",
+    "default_labels_dir": "labels",
+    "default_boxes_file": "boxes.json",
+    "default_tracked_output": "tracked"
+  }
+}
