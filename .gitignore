@@ -4,3 +4,7 @@
 /processed
 /runs
 /images_bbox
+/Beach and sand.v1i.yolov8
+./filter_valid_bbox.ipynb
+yolo26n.pt
+yolov8m.pt
