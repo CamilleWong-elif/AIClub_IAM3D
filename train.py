@@ -5,42 +5,59 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 def main():
-    DATA_YAML = r"C:\github\AIClub_IAM3D\Beach and sand.v1i.yolov8\data.yaml"
+    DATA_YAML = r"C:\github\AIClub_IAM3D\new_dataset\data.yaml"
     model = YOLO("yolov8m.pt")
-    model.tune(data = DATA_YAML, epochs = 20, iterations = 30, optimizer="AdamW", plots = True, save =True)
+    model.train(
+        data=DATA_YAML,
 
-    # model.train(
-    #     data=DATA_YAML,
+        # core training params
+        epochs=120,
+        imgsz=512,
+        batch=8,
+        device=0,
+        workers=0,
 
-    #     # core training params
-    #     epochs=120,
-    #     imgsz=512,           # Chosen image size
-    #     batch=8,
-    #     device=0,            # GPU usage
-    #     workers=0,           # Windows-safe. If stable, try 1-2.
+        # optimizer / schedule
+        optimizer="SGD",
+        lr0=4.0e-05,
+        lrf=0.01044,
+        momentum=0.98,
+        weight_decay=0.00057,
+        warmup_epochs=3.7522,
+        warmup_momentum=0.95,
 
-    #     # optimizer 
-    #     optimizer='SGD',
-    #     lr0=0.003,
-    #     # lrf=1,            
-    #     # cos_lr=True,
-    #     # warmup_epochs=3,
-    #     # weight_decay=5e-4,
+        # loss gains
+        box=8.91994,
+        cls=0.58976,
+        dfl=2.69179,
 
-    #     # augmentations
-    #     mosaic=1.0,          
-    #     close_mosaic=10,    
-    #     mixup=0.05,
-    #     copy_paste=0.0,
-    #     fliplr=0.5,
+        # color / geometric augmentations
+        hsv_h=0.02384,
+        hsv_s=0.89915,
+        hsv_v=0.54377,
+        degrees=0.00834,
+        translate=0.09761,
+        scale=0.7178,
+        shear=0.004,
+        perspective=0.00029,
 
-    #     # training behavior
-    #     patience=15,         # early stopping patience
-    #     save=True,           # saves best.pt and last.pt
-    #     plots=True,          # store training plots/label previews
-    #     cache=True,          # set True to cache images in RAM (big memory)
-    #     amp=True,            # use mixed precision (faster on GPU)
-    # )
+        # flip / mix augmentations
+        flipud=0.00562,
+        fliplr=0.44735,
+        bgr=0.00755,
+        mosaic=0.80562,
+        mixup=0.01033,
+        cutmix=0.00035,
+        copy_paste=0.00139,
+        close_mosaic=10,
+
+        # training behavior
+        patience=15,
+        save=True,
+        plots=True,
+        cache=True,
+        amp=True,
+    )
 
 
 if __name__ == "__main__":
