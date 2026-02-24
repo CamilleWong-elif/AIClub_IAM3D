@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['obj','sand/background','large collection of objects']
+
+roboflow:
+  workspace: labelling-ycpd8
+  project: beach-and-sand-or7mh
+  version: 1
+  license: CC BY 4.0
+  url: https://app.roboflow.com/labelling-ycpd8/beach-and-sand-or7mh/1

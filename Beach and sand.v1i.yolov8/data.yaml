@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 7
+names: ['- collaborate with your team on computer vision projects', '- collect - organize images', '- understand and search unstructured image data', '------------------------------', 'Roboflow is an end-to-end computer vision platform that helps you', 'This dataset was exported via roboflow.com on October 17- 2023 at 9-22 AM GMT', 'beach3 - v2 2022-02-01 6-06pm']
+
+roboflow:
+  workspace: yoloiam3d
+  project: beach-and-sand-bsoju
+  version: 1
+  license: CC BY 4.0
+  url: https://app.roboflow.com/yoloiam3d/beach-and-sand-bsoju/1

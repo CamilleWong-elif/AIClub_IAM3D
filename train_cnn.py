@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 # -------------------------
 # CONFIG
 # -------------------------
-DATASET_ROOT = "/path/to/your/dataset"  # change this: expects train/, valid/ with images/ + labels/
+DATASET_ROOT = "new_dataset"  # change this: expects train/, valid/ with images/ + labels/
 
 IMG_SIZE = 416
 BATCH_SIZE = 8
