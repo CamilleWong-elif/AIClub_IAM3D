@@ -43,8 +43,8 @@ class CNNDetector(BaseDetector):
     def _load_checkpoint(self, path):
         """Load backbone + head weights from a train_cnn.py checkpoint."""
         ckpt = torch.load(path, map_location=self.device, weights_only=True)
-        self.backbone.load_state_dict(ckpt["backbone"])
-        self.head.load_state_dict(ckpt["head"])
+        self.backbone.load_state_dict(ckpt["backbone_state"])
+        self.head.load_state_dict(ckpt["head_state"])
         print(f"[CNNDetector] Loaded weights from {path}")
 
     def detect(self, image):

@@ -29,7 +29,7 @@ WEIGHT_DECAY = 5e-4
 PATIENCE = 15           # early stopping
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NUM_WORKERS = 0         # set to 2-4 if stable on your machine
-NUM_CLASSES = 1         # single-class (trash)
+NUM_CLASSES = 3         # single-class (trash)
 SAVE_DIR = "runs/cnn"   # where to save checkpoints
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
