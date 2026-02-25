@@ -1,3 +1,5 @@
+#IN PROGRESS
+
 # train_yolo.py
 from ultralytics import YOLO
 
@@ -7,6 +9,15 @@ os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 def main():
     DATA_YAML = r"C:\github\AIClub_IAM3D\new_dataset\data.yaml"
     model = YOLO("yolov8m.pt")
+    from ultralytics.data.dataset import YOLODataset
+    _original_load_image = YOLODataset.load_image
+    def _patched_load_image(self, i):
+        img, hw_original, hw_resized = _original_load_image(self, i)
+        for aug in cv2_augmentations:
+            img = aug(img)
+        return img, hw_original, hw_resized
+
+    YOLODataset.load_image = _patched_load_image
     model.train(
         data=DATA_YAML,
 
