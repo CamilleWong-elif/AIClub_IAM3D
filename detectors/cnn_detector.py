@@ -17,13 +17,7 @@ from config.anchors import ANCHORS
 
 
 class CNNDetector(BaseDetector):
-    def __init__(self, device="cpu", checkpoint_path=None):
-        """
-        Args:
-            device: 'cpu' or 'cuda'
-            checkpoint_path: Path to .pt file saved by train_cnn.py.
-                             If None, uses random (untrained) weights.
-        """
+    def __init__(self, device="cpu", weights_path=None):
         self.device = device
         self.num_classes = len(TRASH_CLASSES)
         self.num_anchors = len(ANCHORS)
@@ -34,8 +28,12 @@ class CNNDetector(BaseDetector):
             self.num_anchors
         ).to(device)
 
-        if checkpoint_path is not None:
-            self._load_checkpoint(checkpoint_path)
+        # Load trained weights
+        if weights_path is not None:
+            checkpoint = torch.load(weights_path, map_location=device)
+            self.backbone.load_state_dict(checkpoint["backbone_state"])
+            self.head.load_state_dict(checkpoint["head_state"])
+            print(f"Loaded weights from {weights_path} (epoch {checkpoint['epoch']})")
 
         self.backbone.eval()
         self.head.eval()

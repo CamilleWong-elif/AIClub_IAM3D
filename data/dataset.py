@@ -1,16 +1,20 @@
 """
-YOLO-format dataset for training the custom CNN detector.
+Datasets for the custom CNN detector.
 
-Expects standard YOLO folder layout:
+RoverDataset:
+    General-purpose loader. Returns image tensor + raw YOLO boxes.
+    Use for evaluation, visualization, or custom pipelines.
+
+TrashDetectionDataset:
+    Training-specific loader. Encodes GT into anchor-based target tensors
+    matching DetectionHead output shape. Use with train_cnn.py + DetectionLoss.
+
+Both expect standard YOLO folder layout:
     split_root/
         images/
         labels/
 
 Labels: class_id cx cy w h (all normalized 0-1).
-Single-class: class_id is always 0.
-
-Encodes ground truth into anchor-based target tensors matching
-the output shape of DetectionHead.
 """
 
 import os
@@ -18,21 +22,65 @@ import cv2
 import torch
 import numpy as np
 from torch.utils.data import Dataset
+from PIL import Image
 from config.anchors import ANCHORS
 
 
+# -------------------------------------------------------
+# Original general-purpose dataset
+# -------------------------------------------------------
+class RoverDataset(Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.image_dir = os.path.join(root_dir, "images")
+        self.label_dir = os.path.join(root_dir, "labels")
+        self.transform = transform
+
+        self.images = sorted(os.listdir(self.image_dir))
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        img_name = self.images[idx]
+        img_path = os.path.join(self.image_dir, img_name)
+
+        image = Image.open(img_path).convert("RGB")
+
+        label_path = os.path.join(
+            self.label_dir,
+            os.path.splitext(img_name)[0] + ".txt"
+        )
+
+        boxes = []
+        if os.path.exists(label_path):
+            with open(label_path, "r") as f:
+                for line in f:
+                    class_id, cx, cy, w, h = map(float, line.split())
+                    boxes.append([class_id, cx, cy, w, h])
+
+        boxes = torch.tensor(boxes, dtype=torch.float32)
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, boxes
+
+
+# -------------------------------------------------------
+# Training dataset with anchor-based target encoding
+# -------------------------------------------------------
 class TrashDetectionDataset(Dataset):
     """
     Args:
         root:        Path to split folder (e.g. dataset/train/)
         img_size:    Resize all images to (img_size, img_size)
-        num_classes: Number of object classes (1 for single-class)
+        num_classes: Number of object classes (3: object, sand, large_collection)
         augment:     If True, apply horizontal flip augmentation
     """
 
     IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
-    def __init__(self, root, img_size=416, num_classes=1, augment=False):
+    def __init__(self, root, img_size=416, num_classes=3, augment=False):
         self.root = root
         self.img_size = img_size
         self.num_classes = num_classes
@@ -95,7 +143,7 @@ class TrashDetectionDataset(Dataset):
             grid_size = img_size // 8
 
         Target shape: (num_anchors, 5 + num_classes, grid_h, grid_w)
-        Per anchor per cell: [tx, ty, tw, th, objectness, class_0, ...]
+        Per anchor per cell: [tx, ty, tw, th, objectness, class_0, class_1, class_2]
             - objectness = 1 where GT box is assigned, 0 elsewhere
             - tx, ty = fractional offset within grid cell
             - tw, th = log(gt_size / anchor_size)
@@ -107,7 +155,6 @@ class TrashDetectionDataset(Dataset):
         target = torch.zeros(num_anchors, 5 + self.num_classes, grid_size, grid_size)
 
         for cls_id, cx, cy, bw, bh in gt_boxes:
-            # Grid cell for box center
             gx = min(int(cx * grid_size), grid_size - 1)
             gy = min(int(cy * grid_size), grid_size - 1)
 
@@ -126,7 +173,6 @@ class TrashDetectionDataset(Dataset):
 
             aw, ah = self.anchors[best_anchor]
 
-            # Encode
             tx = cx * grid_size - gx
             ty = cy * grid_size - gy
             tw = np.log(bw / aw + 1e-8)
@@ -136,7 +182,7 @@ class TrashDetectionDataset(Dataset):
             target[best_anchor, 1, gy, gx] = ty
             target[best_anchor, 2, gy, gx] = tw
             target[best_anchor, 3, gy, gx] = th
-            target[best_anchor, 4, gy, gx] = 1.0  # objectness
+            target[best_anchor, 4, gy, gx] = 1.0
 
             if cls_id < self.num_classes:
                 target[best_anchor, 5 + cls_id, gy, gx] = 1.0
