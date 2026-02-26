@@ -5,8 +5,8 @@ import os
 import cv2
 import numpy as np
 
-from cv2_augmentations import cv2_augmentations
-from torchvision_augmentations import apply_torchvision
+from CV2 import cv2_augmentations
+from CV2.torchvision_augmentations import torchvision_transforms
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -31,7 +31,7 @@ def main():
             img = aug(img)
 
         # Apply torchvision augmentations
-        img = apply_torchvision(img)
+        img = torchvision_transforms(img)
 
         # Show original + augmented (only first 5 images)
         if DEBUG_VISUALIZE and i < 5:
