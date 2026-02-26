@@ -1,23 +1,50 @@
-#IN PROGRESS
-
 # train_yolo.py
 from ultralytics import YOLO
 
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+import cv2
+import numpy as np
+
+from cv2_augmentations import cv2_augmentations
+from torchvision_augmentations import apply_torchvision
+
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+DEBUG_VISUALIZE = True  # Set False after confirming augmentations work
+
 
 def main():
     DATA_YAML = r"C:\github\AIClub_IAM3D\new_dataset\data.yaml"
     model = YOLO("yolov8m.pt")
+
+    # ---- Patch YOLO Dataset Loader ----
     from ultralytics.data.dataset import YOLODataset
     _original_load_image = YOLODataset.load_image
+
     def _patched_load_image(self, i):
         img, hw_original, hw_resized = _original_load_image(self, i)
+
+        original = img.copy()  # save original image
+
+        # Apply cv2 augmentations
         for aug in cv2_augmentations:
             img = aug(img)
+
+        # Apply torchvision augmentations
+        img = apply_torchvision(img)
+
+        # Show original + augmented (only first 5 images)
+        if DEBUG_VISUALIZE and i < 5:
+            combined = np.hstack((original, img))
+            cv2.imshow("Original | Augmented", combined)
+            cv2.waitKey(500)  # show for 0.5 seconds
+            cv2.destroyAllWindows()
+
         return img, hw_original, hw_resized
 
     YOLODataset.load_image = _patched_load_image
+    # ------------------------------------
+
     model.train(
         data=DATA_YAML,
 
@@ -42,7 +69,7 @@ def main():
         cls=0.58976,
         dfl=2.69179,
 
-        # color / geometric augmentations
+        # color / geometric augmentations (YOLO built-in)
         hsv_h=0.02384,
         hsv_s=0.89915,
         hsv_v=0.54377,
