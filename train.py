@@ -5,14 +5,14 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 def main():
-    DATA_YAML = r"C:\github\AIClub_IAM3D\new_dataset\data.yaml"
-    model = YOLO("yolov8m.pt")
+    DATA_YAML = r"C:\github\dataset\Beach and sand.v1140i.yolov8\data.yaml"
+    model = YOLO("yolo26n.pt")
     model.train(
         data=DATA_YAML,
 
         # core training params
         epochs=120,
-        imgsz=512,
+        imgsz=640,
         batch=8,
         device=0,
         workers=0,
