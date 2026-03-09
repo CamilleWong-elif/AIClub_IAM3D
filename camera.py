@@ -1,22 +1,15 @@
 """
-Live YOLO detection on Pi camera stream.
-
-Branch: Syn
-Runs on your LOCAL machine (not the Pi).
-
-Connects to the Pi's MJPEG stream (from stream.py), runs YOLO on each frame,
-displays results with bounding boxes, and can record the annotated video.
+Simple live camera feed + recording for Raspberry Pi 5 + Camera Module 3.
 
 Terminal controls:
-    1 = Start recording (annotated video with boxes)
+    1 = Start recording
     2 = Stop recording
     3 = Save (shows file path + size)
     q = Quit
 
 Usage:
-    python live_yolo.py --weights best.pt --stream http://<pi-ip>:8000/stream.mjpg
-    python live_yolo.py --weights best.pt --stream http://192.168.1.50:8000/stream.mjpg
-    python live_yolo.py --weights best.pt --stream http://192.168.1.50:8000/stream.mjpg --conf 0.25
+    python camera.py
+    python camera.py --resolution 1280 720 --fps 30
 """
 
 import os
@@ -29,7 +22,7 @@ from datetime import datetime
 
 
 # ---------------------------------------------------------------------------
-# Non-blocking keyboard input
+# Non-blocking keyboard input (works over SSH)
 # ---------------------------------------------------------------------------
 class KeyboardListener:
     def __init__(self):
@@ -73,82 +66,41 @@ class KeyboardListener:
 
 
 # ---------------------------------------------------------------------------
-# Drawing
-# ---------------------------------------------------------------------------
-def draw_detections(frame, results):
-    """Draw YOLO detection boxes on frame."""
-    if results[0].boxes is None or len(results[0].boxes) == 0:
-        return frame
-
-    boxes = results[0].boxes
-    xyxy = boxes.xyxy.cpu().numpy()
-    confs = boxes.conf.cpu().numpy()
-    classes = boxes.cls.cpu().numpy().astype(int)
-    names = results[0].names
-
-    colors = [(0, 255, 0), (0, 255, 255), (0, 0, 255), (255, 0, 0), (255, 255, 0)]
-
-    for i in range(len(xyxy)):
-        x1, y1, x2, y2 = map(int, xyxy[i])
-        conf = confs[i]
-        cls_id = classes[i]
-        cls_name = names.get(cls_id, f"cls{cls_id}")
-        color = colors[cls_id % len(colors)]
-
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-        label = f"{cls_name} {conf:.2f}"
-        cv2.putText(frame, label, (x1, y1 - 8),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2, cv2.LINE_AA)
-
-    return frame
-
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def parse_args():
-    parser = argparse.ArgumentParser(description="Live YOLO on Pi stream (runs locally)")
-    parser.add_argument("--weights", type=str, required=True,
-                        help="Path to YOLO .pt weights")
-    parser.add_argument("--stream", type=str, required=True,
-                        help="MJPEG stream URL (e.g. http://192.168.1.50:8000/stream.mjpg)")
-    parser.add_argument("--conf", type=float, default=0.3,
-                        help="Detection confidence threshold (default: 0.3)")
+    parser = argparse.ArgumentParser(description="Pi Camera live feed + recording")
+    parser.add_argument("--resolution", type=int, nargs=2, default=[640, 480],
+                        help="Width Height (default: 640 480)")
+    parser.add_argument("--fps", type=int, default=30,
+                        help="Framerate (default: 30)")
     parser.add_argument("--save-dir", type=str, default="recordings",
-                        help="Directory for recordings (default: recordings/)")
+                        help="Directory for saved recordings (default: recordings/)")
+    parser.add_argument("--no-display", action="store_true",
+                        help="Headless mode (no preview window)")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    width, height = args.resolution
 
-    # ---- Load YOLO ----
+    # ---- Init camera ----
     try:
-        from ultralytics import YOLO
+        from picamera2 import Picamera2
     except ImportError:
-        print("ERROR: ultralytics not installed. pip install ultralytics")
+        print("ERROR: picamera2 not installed.")
+        print("  Install with: sudo apt install python3-picamera2")
         sys.exit(1)
 
-    print(f"Loading YOLO model: {args.weights}")
-    model = YOLO(args.weights)
-    print("Model loaded.")
-
-    # ---- Connect to stream ----
-    print(f"Connecting to stream: {args.stream}")
-    cap = cv2.VideoCapture(args.stream)
-
-    if not cap.isOpened():
-        print(f"ERROR: Cannot connect to stream at {args.stream}")
-        print("Make sure stream.py is running on the Pi.")
-        sys.exit(1)
-
-    # Get frame dimensions from first frame
-    ret, test_frame = cap.read()
-    if not ret:
-        print("ERROR: Could not read frame from stream.")
-        sys.exit(1)
-    height, width = test_frame.shape[:2]
-    print(f"Connected. Frame size: {width}x{height}")
+    print(f"Starting camera: {width}x{height} @ {args.fps}fps")
+    picam2 = Picamera2()
+    video_config = picam2.create_video_configuration(
+        main={"format": "RGB888", "size": (width, height)},
+    )
+    picam2.configure(video_config)
+    picam2.start()
+    time.sleep(1)  # warm up + autofocus
 
     # ---- State ----
     os.makedirs(args.save_dir, exist_ok=True)
@@ -159,7 +111,7 @@ def main():
 
     kb = KeyboardListener()
 
-    print("\n--- Live YOLO detection on Pi stream ---")
+    print("\n--- Camera ready ---")
     print("1 = Record | 2 = Stop | 3 = Save | q = Quit\n")
 
     frame_count = 0
@@ -168,20 +120,9 @@ def main():
 
     try:
         while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("[WARN] Lost stream. Reconnecting...")
-                cap.release()
-                time.sleep(1)
-                cap = cv2.VideoCapture(args.stream)
-                continue
-
-            # ---- YOLO inference ----
-            # OpenCV gives BGR, YOLO handles both BGR and RGB
-            results = model(frame, conf=args.conf, verbose=False)
-
-            # ---- Draw ----
-            frame = draw_detections(frame, results)
+            # ---- Capture ----
+            frame_rgb = picam2.capture_array("main")
+            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
 
             # ---- FPS ----
             frame_count += 1
@@ -192,23 +133,23 @@ def main():
                 fps_timer = time.time()
 
             # ---- HUD ----
-            num_dets = len(results[0].boxes) if results[0].boxes is not None else 0
-            status = f"FPS: {fps:.1f} | Detections: {num_dets}"
+            status = f"FPS: {fps:.1f}"
             if recording:
                 status += "  [REC]"
-                cv2.circle(frame, (width - 30, 25), 8, (0, 0, 255), -1)
-            cv2.putText(frame, status, (10, 25),
+                cv2.circle(frame_bgr, (width - 30, 25), 8, (0, 0, 255), -1)
+            cv2.putText(frame_bgr, status, (10, 25),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            cv2.putText(frame, "1=Rec 2=Stop 3=Save q=Quit", (10, height - 15),
+            cv2.putText(frame_bgr, "1=Rec 2=Stop 3=Save q=Quit", (10, height - 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
 
             # ---- Record ----
             if recording and video_writer is not None:
-                video_writer.write(frame)
+                video_writer.write(frame_bgr)
 
             # ---- Display ----
-            cv2.imshow("YOLO Live (Pi Stream)", frame)
-            cv2.waitKey(1)
+            if not args.no_display:
+                cv2.imshow("Camera", frame_bgr)
+                cv2.waitKey(1)
 
             # ---- Keyboard ----
             key = kb.get_key()
@@ -217,7 +158,7 @@ def main():
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 current_path = os.path.join(args.save_dir, f"rec_{timestamp}.mp4")
                 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-                video_writer = cv2.VideoWriter(current_path, fourcc, 30.0, (width, height))
+                video_writer = cv2.VideoWriter(current_path, fourcc, args.fps, (width, height))
                 recording = True
                 print(f"[REC] Started: {current_path}")
 
@@ -249,7 +190,7 @@ def main():
         if recording and video_writer is not None:
             video_writer.release()
             print(f"[SAVED] Auto-saved: {current_path}")
-        cap.release()
+        picam2.stop()
         cv2.destroyAllWindows()
         print("Done.")
 
