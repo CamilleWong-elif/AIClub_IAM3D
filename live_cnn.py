@@ -1,25 +1,28 @@
 """
-Live camera feed + custom CNN detection + MOT tracking for Raspberry Pi 5 + Camera Module 3.
+Live CNN detection + MOT tracking on Pi camera stream.
 
 Branch: custom_bbox
+Runs on your LOCAL machine (not the Pi).
+
+Connects to the Pi's MJPEG stream (from stream.py), runs CNNDetector + NMS + tracking
+on each frame, displays results with bounding boxes and track IDs.
 
 Terminal controls:
-    1 = Start recording
+    1 = Start recording (annotated video with boxes)
     2 = Stop recording
     3 = Save (shows file path + size)
     q = Quit
 
 Usage:
-    python live.py --weights runs/cnn/best.pt
-    python live.py --weights runs/cnn/best.pt --resolution 640 480 --fps 30
-    python live.py --weights runs/cnn/best.pt --no-display
+    python live_cnn.py --weights runs/cnn/best.pt --stream http://<pi-ip>:8000/stream.mjpg
+    python live_cnn.py --weights runs/cnn/best.pt --stream http://192.168.1.50:8000/stream.mjpg
 """
 
 import os
 import sys
 import cv2
-import time
 import json
+import time
 import argparse
 import threading
 from datetime import datetime
@@ -84,12 +87,6 @@ class LiveTracker:
         self.active_tracks = []
 
     def update(self, detections):
-        """
-        Args:
-            detections: list of BoundingBox objects (after NMS)
-        Returns:
-            list of dicts with track_id + box info
-        """
         det_boxes = [{"x1": d.x1, "y1": d.y1, "x2": d.x2, "y2": d.y2} for d in detections]
         track_boxes = [{"x1": t["x1"], "y1": t["y1"], "x2": t["x2"], "y2": t["y2"]}
                        for t in self.active_tracks]
@@ -153,19 +150,15 @@ def draw_tracks(frame, tracks):
 # Main
 # ---------------------------------------------------------------------------
 def parse_args():
-    parser = argparse.ArgumentParser(description="Live CNN detection + tracking (custom_bbox branch)")
+    parser = argparse.ArgumentParser(description="Live CNN detection + tracking on Pi stream (runs locally)")
     parser.add_argument("--weights", type=str, required=True,
                         help="Path to CNN checkpoint (runs/cnn/best.pt)")
+    parser.add_argument("--stream", type=str, required=True,
+                        help="MJPEG stream URL (e.g. http://192.168.1.50:8000/stream.mjpg)")
     parser.add_argument("--config", type=str, default="bbox_standalone/config.json",
                         help="Path to config.json for thresholds")
-    parser.add_argument("--resolution", type=int, nargs=2, default=[640, 480],
-                        help="Width Height (default: 640 480)")
-    parser.add_argument("--fps", type=int, default=30,
-                        help="Framerate (default: 30)")
     parser.add_argument("--save-dir", type=str, default="recordings",
                         help="Directory for recordings (default: recordings/)")
-    parser.add_argument("--no-display", action="store_true",
-                        help="Headless mode (no preview window)")
     return parser.parse_args()
 
 
@@ -183,7 +176,6 @@ def load_config(config_path):
 
 def main():
     args = parse_args()
-    width, height = args.resolution
 
     # ---- Config ----
     cfg = load_config(args.config)
@@ -200,21 +192,21 @@ def main():
     # ---- Init tracker ----
     tracker = LiveTracker(iou_threshold=track_iou)
 
-    # ---- Init camera ----
-    try:
-        from picamera2 import Picamera2
-    except ImportError:
-        print("ERROR: picamera2 not installed. sudo apt install python3-picamera2")
+    # ---- Connect to stream ----
+    print(f"Connecting to stream: {args.stream}")
+    cap = cv2.VideoCapture(args.stream)
+
+    if not cap.isOpened():
+        print(f"ERROR: Cannot connect to stream at {args.stream}")
+        print("Make sure stream.py is running on the Pi.")
         sys.exit(1)
 
-    print(f"Starting camera: {width}x{height} @ {args.fps}fps")
-    picam2 = Picamera2()
-    video_config = picam2.create_video_configuration(
-        main={"format": "RGB888", "size": (width, height)},
-    )
-    picam2.configure(video_config)
-    picam2.start()
-    time.sleep(1)
+    ret, test_frame = cap.read()
+    if not ret:
+        print("ERROR: Could not read frame from stream.")
+        sys.exit(1)
+    height, width = test_frame.shape[:2]
+    print(f"Connected. Frame size: {width}x{height}")
 
     # ---- State ----
     os.makedirs(args.save_dir, exist_ok=True)
@@ -225,7 +217,7 @@ def main():
 
     kb = KeyboardListener()
 
-    print("\n--- Live CNN detection + tracking running ---")
+    print("\n--- Live CNN detection + tracking on Pi stream ---")
     print("1 = Record | 2 = Stop | 3 = Save | q = Quit\n")
 
     frame_count = 0
@@ -234,19 +226,24 @@ def main():
 
     try:
         while True:
-            # ---- Capture ----
-            frame_rgb = picam2.capture_array("main")
+            ret, frame = cap.read()
+            if not ret:
+                print("[WARN] Lost stream. Reconnecting...")
+                cap.release()
+                time.sleep(1)
+                cap = cv2.VideoCapture(args.stream)
+                continue
 
             # ---- Detect + NMS ----
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             raw_boxes = detector.detect(frame_rgb)
             final_boxes = non_max_suppression(raw_boxes, nms_iou, nms_score)
 
             # ---- Track ----
             tracked = tracker.update(final_boxes)
 
-            # ---- Draw on BGR frame ----
-            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
-            frame_bgr = draw_tracks(frame_bgr, tracked)
+            # ---- Draw ----
+            frame = draw_tracks(frame, tracked)
 
             # ---- FPS ----
             frame_count += 1
@@ -260,20 +257,19 @@ def main():
             status = f"FPS: {fps:.1f} | Tracks: {len(tracked)}"
             if recording:
                 status += "  [REC]"
-                cv2.circle(frame_bgr, (width - 30, 25), 8, (0, 0, 255), -1)
-            cv2.putText(frame_bgr, status, (10, 25),
+                cv2.circle(frame, (width - 30, 25), 8, (0, 0, 255), -1)
+            cv2.putText(frame, status, (10, 25),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            cv2.putText(frame_bgr, "1=Rec 2=Stop 3=Save q=Quit", (10, height - 15),
+            cv2.putText(frame, "1=Rec 2=Stop 3=Save q=Quit", (10, height - 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
 
             # ---- Record ----
             if recording and video_writer is not None:
-                video_writer.write(frame_bgr)
+                video_writer.write(frame)
 
             # ---- Display ----
-            if not args.no_display:
-                cv2.imshow("CNN Live", frame_bgr)
-                cv2.waitKey(1)
+            cv2.imshow("CNN Live (Pi Stream)", frame)
+            cv2.waitKey(1)
 
             # ---- Keyboard ----
             key = kb.get_key()
@@ -282,7 +278,7 @@ def main():
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 current_path = os.path.join(args.save_dir, f"rec_{timestamp}.mp4")
                 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-                video_writer = cv2.VideoWriter(current_path, fourcc, args.fps, (width, height))
+                video_writer = cv2.VideoWriter(current_path, fourcc, 30.0, (width, height))
                 recording = True
                 print(f"[REC] Started: {current_path}")
 
@@ -314,7 +310,7 @@ def main():
         if recording and video_writer is not None:
             video_writer.release()
             print(f"[SAVED] Auto-saved: {current_path}")
-        picam2.stop()
+        cap.release()
         cv2.destroyAllWindows()
         print("Done.")
 
