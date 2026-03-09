@@ -10,11 +10,9 @@ from torchvision_augmentations import torchvision_transforms
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-DEBUG_VISUALIZE = True  # Set to False after confirming it works
-
 
 def main():
-    DATA_YAML = r"C:\github\AIClub_IAM3D\new_dataset\data.yaml"
+    DATA_YAML = "new_dataset/data.yaml"
     model = YOLO("yolov8m.pt")
 
     # Patch YOLO dataset loader (in-memory only)
@@ -24,33 +22,24 @@ def main():
     def _patched_load_image(self, i):
         img, hw_original, hw_resized = _original_load_image(self, i)
 
-        original = img.copy()  # Save original before augmentation
-
         # Apply CV2 augmentations
         for aug in cv2_augmentations:
             img = aug(img)
 
-        # Convert BGR → RGB for torchvision
+        # Convert BGR → RGB
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # Convert numpy → PIL
+        # numpy → PIL
         pil_img = Image.fromarray(img_rgb)
 
-        # Apply torchvision transforms
+        # torchvision transforms
         pil_img = torchvision_transforms(pil_img)
 
-        # Convert PIL → numpy
+        # PIL → numpy
         img_rgb = np.array(pil_img)
 
-        # Convert RGB → BGR (YOLO expects BGR)
+        # RGB → BGR
         img = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-
-        # Display original + augmented (first 5 images only)
-        if DEBUG_VISUALIZE and i < 5:
-            combined = np.hstack((original, img))
-            cv2.imshow("Original | Augmented", combined)
-            cv2.waitKey(800)
-            cv2.destroyAllWindows()
 
         return img, hw_original, hw_resized
 
@@ -60,9 +49,10 @@ def main():
         data=DATA_YAML,
 
         epochs=120,
-        imgsz=512,
+        imgsz=512,x
         batch=8,
-        device=0,
+        device=0,   # FIXED
+
         workers=0,
 
         optimizer="SGD",
