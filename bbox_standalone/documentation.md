@@ -202,3 +202,10 @@ Default path hints (e.g. default folders for frames/labels or default output fil
 - **Tracking (tracking.iou_threshold)**: Controls **how easily** a detection is assigned to an existing track vs starting a new track. This directly affects **identity consistency** over time.
 
 Changing these in **config.json** is the intended way to tune the bounding box and tracking behavior for your data and use case.
+
+# custom bbox
+# fix validation loss
+# print
+# total accuracy
+# object
+# no object
