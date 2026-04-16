@@ -1,0 +1,1 @@
+python3 pi_stream --camera 0 --port 8000 &

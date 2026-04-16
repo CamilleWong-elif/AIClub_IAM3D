@@ -1,0 +1,15 @@
+#sudo nano /etc/systemd/system/my_startup.service
+
+[Unit]
+Description=My Startup Script
+After=network.target
+
+[Service]
+ExecStart=/home/dmarcelo/start_cameras.sh
+ExecStart=/home/dmarcelo/test2
+WorkingDirectory=/home/dmarcelo
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
