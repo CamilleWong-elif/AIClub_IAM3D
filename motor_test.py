@@ -5,8 +5,6 @@ Interactive Throttle Tuner
 W / S  — increase / decrease MAX_THROTTLE_PCT by 0.01
 D / A  — increase / decrease RAMP_TIME_SEC by 0.25
 Q      — quit
-
-Run with: python3 throttle_interactive.py
 """
 
 import threading
